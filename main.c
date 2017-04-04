@@ -5,6 +5,8 @@ You may add or rearrange any code or data as you need.
 The header files page_table.h and disk.h explain
 how to use the page table and disk interfaces.
 */
+//Thomas Franceschi
+//Kyle Williams
 
 #include "page_table.h"
 #include "disk.h"
@@ -17,8 +19,9 @@ how to use the page table and disk interfaces.
 
 void page_fault_handler( struct page_table *pt, int page )
 {
+	page_table_set_entry(pt,page,page,PROT_READ|PROT_WRITE);
 	printf("page fault on page #%d\n",page);
-	exit(1);
+	//exit(1);
 }
 
 int main( int argc, char *argv[] )
