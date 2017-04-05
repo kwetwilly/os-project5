@@ -17,11 +17,37 @@ how to use the page table and disk interfaces.
 #include <string.h>
 #include <errno.h>
 
+const char *algorithm;
+struct disk *disk;
+char *physmem;
+int nframes;
+int npages;
+int freeFrames[1024] = {0};
+
 void page_fault_handler( struct page_table *pt, int page )
 {
-	page_table_set_entry(pt,page,page,PROT_READ|PROT_WRITE);
+	int frame, bits;
+	//Check type of error
+	page_table_get_entry( pt, page, &frame, &bits );
+
+	//No permissions
+	if(bits == 0){
+		//set just read
+		int myframe = page%nframes;
+		page_table_set_entry(pt,page,myframe,PROT_READ);
+		disk_read( disk, page,&physmem[myframe*PAGE_SIZE]);
+		freeFrames[page%nframes] = 1; //mark used
+	}
+	//Read only
+	else if(bits == 1){
+		//set read + write
+		page_table_set_entry(pt,page,page%nframes,PROT_READ|PROT_WRITE);
+		freeFrames[page%nframes] = 1; //mark used
+	}
+	
+	page_table_get_entry( pt, page, &frame, &bits );
+	//page_table_print( pt );
 	printf("page fault on page #%d\n",page);
-	//exit(1);
 }
 
 int main( int argc, char *argv[] )
@@ -31,11 +57,19 @@ int main( int argc, char *argv[] )
 		return 1;
 	}
 
-	int npages = atoi(argv[1]);
-	int nframes = atoi(argv[2]);
+	npages = atoi(argv[1]);
+	nframes = atoi(argv[2]);
+	algorithm = argv[3]; //algorithm to use
 	const char *program = argv[4];
 
-	struct disk *disk = disk_open("myvirtualdisk",npages);
+	//Check is nframes>npages
+	if(nframes>npages) nframes = npages;
+
+	//set delimeter for free frames
+	freeFrames[nframes] = -1;
+	
+
+	disk = disk_open("myvirtualdisk",npages);
 	if(!disk) {
 		fprintf(stderr,"couldn't create virtual disk: %s\n",strerror(errno));
 		return 1;
@@ -50,7 +84,7 @@ int main( int argc, char *argv[] )
 
 	char *virtmem = page_table_get_virtmem(pt);
 
-	char *physmem = page_table_get_physmem(pt);
+	physmem = page_table_get_physmem(pt);
 
 	if(!strcmp(program,"sort")) {
 		sort_program(virtmem,npages*PAGE_SIZE);
