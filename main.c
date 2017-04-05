@@ -24,6 +24,32 @@ int nframes;
 int npages;
 int framemap[1024] = {0};
 
+int isFull(){
+	int full = 1;
+	int i = 0;
+	for( int i = 0; i < nframes; i++ ){
+		if (framemap[i] == -1){
+			full = 0;
+		}
+	}
+	return full;
+}
+
+int nextOpen(){
+	int i = 0;
+	for( i = 0; i < nframes; i++){
+		if (framemap[i] == -1){
+			return i;
+		}
+	}
+	return -1; //error: should not get here
+}
+
+int random_algo(){
+	int newFrame;
+	return newFrame;
+}
+
 void page_fault_handler( struct page_table *pt, int page )
 {
 	int frame, bits;
