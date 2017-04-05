@@ -16,6 +16,7 @@ how to use the page table and disk interfaces.
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <time.h>
 
 const char *algorithm;
 struct disk *disk;
@@ -44,9 +45,9 @@ int nextOpen(){
 	return -1; //error: should not get here
 }
 
-int random_algo(){
-	int newFrame = 0;
-	//Do shit here
+int random_algo(int page){
+	//int newFrame = rand() % nframes;
+	int newFrame = (page + 1) % nframes;
 	return newFrame;
 }
 
@@ -63,7 +64,19 @@ void page_fault_handler( struct page_table *pt, int page )
 		//If frames all full, kick out a page
 		if(isFull()){
 			//Decide which frame to put page into
-			myframe = page%nframes; //ALGORITHM USED HERE------------------
+			if(!strcmp(algorithm,"rand")) {
+				myframe = random_algo(page);
+
+			} else if(!strcmp(algorithm,"fifo")) {
+				myframe = 0; //implement later
+
+			} else if(!strcmp(algorithm,"custom")) {
+				myframe = 0; //implement later
+
+			} else {
+				printf("unknown algo\n");
+				myframe = page%nframes; //DEFAULT for now
+			}
 			
 			printf("EVICTED!\n");
 			disk_write( disk, framemap[myframe], &physmem[myframe*PAGE_SIZE]);
@@ -112,6 +125,9 @@ int main( int argc, char *argv[] )
 	for(i = 0; i < 1024; i++){
 		framemap[i] = -1;
 	}
+	
+	//seedrand
+	srand(time(NULL));
 	
 
 	disk = disk_open("myvirtualdisk",npages);
