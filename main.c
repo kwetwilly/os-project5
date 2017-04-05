@@ -25,28 +25,28 @@ int npages;
 int framemap[1024] = {0};
 
 int isFull(){
-	int full = 1;
 	int i = 0;
-	for( int i = 0; i < nframes; i++ ){
+	for( i = 0; i < nframes; i++ ){
 		if (framemap[i] == -1){
-			full = 0;
+			return 0;
 		}
 	}
-	return full;
+	return 1;
 }
 
 int nextOpen(){
-	int i = 0;
-	for( i = 0; i < nframes; i++){
-		if (framemap[i] == -1){
-			return i;
+	int j = 0;
+	for( j = 0; j < nframes; j++){
+		if (framemap[j] == -1){
+			return j;
 		}
 	}
 	return -1; //error: should not get here
 }
 
 int random_algo(){
-	int newFrame;
+	int newFrame = 0;
+	//Do shit here
 	return newFrame;
 }
 
@@ -58,19 +58,23 @@ void page_fault_handler( struct page_table *pt, int page )
 
 	//No permissions -- not in memory
 	if(bits == 0){
-		//Decide which frame to put page into
-		int myframe = page%nframes; //ALGORITHM USED HERE------------------
+		int myframe;
 
-		//check if destination frame contains different page
-		if(framemap[myframe] != page && framemap[myframe] != -1){
+		//If frames all full, kick out a page
+		if(isFull()){
+			//Decide which frame to put page into
+			myframe = page%nframes; //ALGORITHM USED HERE------------------
+			
 			printf("EVICTED!\n");
 			disk_write( disk, framemap[myframe], &physmem[myframe*PAGE_SIZE]);
 			disk_read( disk, page, &physmem[myframe*PAGE_SIZE]);
 			page_table_set_entry( pt, page, myframe, PROT_READ);	//Give rights to new page
-			page_table_set_entry( pt, framemap[myframe], 0, 0);	//strip acces from old page
+			page_table_set_entry( pt, framemap[myframe], 0, 0);		//strip acces from old page
 		}
 		//Else frame is empty
 		else{
+			//pick next open frame
+			myframe = nextOpen();
 			page_table_set_entry(pt,page,myframe,PROT_READ);
 			disk_read( disk, page,&physmem[myframe*PAGE_SIZE]);
 		}
