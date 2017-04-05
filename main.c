@@ -46,21 +46,19 @@ int nextOpen(){
 }
 
 int random_algo(int page){
-	//int newFrame = rand() % nframes;
-	int newFrame = (page + 1) % nframes;
+	int newFrame = rand() % nframes;
 	return newFrame;
 }
 
 void page_fault_handler( struct page_table *pt, int page )
 {
 	int frame, bits;
+	int myframe = -1;
 	//Check type of error
 	page_table_get_entry( pt, page, &frame, &bits );
 
 	//No permissions -- not in memory
 	if(bits == 0){
-		int myframe;
-
 		//If frames all full, kick out a page
 		if(isFull()){
 			//Decide which frame to put page into
@@ -99,9 +97,9 @@ void page_fault_handler( struct page_table *pt, int page )
 	}
 	
 	//Update which page is in the frame in physical memory
-	framemap[page%nframes] = page;
+	framemap[myframe] = page;
 
-	page_table_get_entry( pt, page, &frame, &bits );
+	//page_table_get_entry( pt, page, &frame, &bits );
 	printf("page fault on page #%d\n",page);
 }
 
