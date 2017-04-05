@@ -30,19 +30,32 @@ void page_fault_handler( struct page_table *pt, int page )
 	//Check type of error
 	page_table_get_entry( pt, page, &frame, &bits );
 
-	//No permissions
+	//No permissions -- not in memory
 	if(bits == 0){
 		//set just read
 		int myframe = page%nframes;
-		page_table_set_entry(pt,page,myframe,PROT_READ);
-		disk_read( disk, page,&physmem[myframe*PAGE_SIZE]);
-		freeFrames[page%nframes] = 1; //mark used
+		int newFrame, newBits;
+		page_table_get_entry( pt, page, &newFrame, &newBits );
+		
+		//check if destination frame contains different page
+		if(freeFrames[myframe] != page && newBits != 0){
+			disk_write( disk, freeFrames[myframe], &physmem[page*PAGE_SIZE]);
+			disk_read( disk, page, &physmem[page*PAGE_SIZE]);
+			page_table_set_entry( pt, page, myframe, PROT_READ);	//Give rights to new page
+			page_table_set_entry( pt, freeFrames[myframe], 0, 0);	//strip acces from old page
+		}
+
+		else{
+			page_table_set_entry(pt,page,myframe,PROT_READ);
+			disk_read( disk, page,&physmem[myframe*PAGE_SIZE]);
+		}
+		freeFrames[page%nframes] = page; //mark used
 	}
 	//Read only
 	else if(bits == 1){
 		//set read + write
 		page_table_set_entry(pt,page,page%nframes,PROT_READ|PROT_WRITE);
-		freeFrames[page%nframes] = 1; //mark used
+		freeFrames[page%nframes] = page; //mark used
 	}
 	
 	page_table_get_entry( pt, page, &frame, &bits );
