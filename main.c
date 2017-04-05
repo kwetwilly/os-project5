@@ -22,7 +22,7 @@ struct disk *disk;
 char *physmem;
 int nframes;
 int npages;
-int freeFrames[1024] = {0};
+int framemap[1024] = {0};
 
 void page_fault_handler( struct page_table *pt, int page )
 {
@@ -32,34 +32,33 @@ void page_fault_handler( struct page_table *pt, int page )
 
 	//No permissions -- not in memory
 	if(bits == 0){
-		//set just read
-		int myframe = page%nframes;
-		int newFrame, newBits;
-		page_table_get_entry( pt, page, &newFrame, &newBits );
-		
-		//check if destination frame contains different page
-		if(freeFrames[myframe] != page && newBits != 0){
-			disk_write( disk, freeFrames[myframe], &physmem[page*PAGE_SIZE]);
-			disk_read( disk, page, &physmem[page*PAGE_SIZE]);
-			page_table_set_entry( pt, page, myframe, PROT_READ);	//Give rights to new page
-			page_table_set_entry( pt, freeFrames[myframe], 0, 0);	//strip acces from old page
-		}
+		//Decide which frame to put page into
+		int myframe = page%nframes; //ALGORITHM USED HERE------------------
 
+		//check if destination frame contains different page
+		if(framemap[myframe] != page && framemap[myframe] != -1){
+			printf("EVICTED!\n");
+			disk_write( disk, framemap[myframe], &physmem[myframe*PAGE_SIZE]);
+			disk_read( disk, page, &physmem[myframe*PAGE_SIZE]);
+			page_table_set_entry( pt, page, myframe, PROT_READ);	//Give rights to new page
+			page_table_set_entry( pt, framemap[myframe], 0, 0);	//strip acces from old page
+		}
+		//Else frame is empty
 		else{
 			page_table_set_entry(pt,page,myframe,PROT_READ);
 			disk_read( disk, page,&physmem[myframe*PAGE_SIZE]);
 		}
-		freeFrames[page%nframes] = page; //mark used
 	}
-	//Read only
+	//Read only -- data already in memory
 	else if(bits == 1){
-		//set read + write
+		//Add Write permissions
 		page_table_set_entry(pt,page,page%nframes,PROT_READ|PROT_WRITE);
-		freeFrames[page%nframes] = page; //mark used
 	}
 	
+	//Update which page is in the frame in physical memory
+	framemap[page%nframes] = page;
+
 	page_table_get_entry( pt, page, &frame, &bits );
-	//page_table_print( pt );
 	printf("page fault on page #%d\n",page);
 }
 
@@ -78,8 +77,11 @@ int main( int argc, char *argv[] )
 	//Check is nframes>npages
 	if(nframes>npages) nframes = npages;
 
-	//set delimeter for free frames
-	freeFrames[nframes] = -1;
+	//initilaize frame tracker
+	int i = 0;
+	for(i = 0; i < 1024; i++){
+		framemap[i] = -1;
+	}
 	
 
 	disk = disk_open("myvirtualdisk",npages);
