@@ -23,9 +23,9 @@ struct disk *disk;
 char *physmem;
 int nframes;
 int npages;
-int framemap[1024] = {0};
+int *framemap;
 int fifo_counter;
-int lru_counter[1024] = {0};
+int *lru_counter;
 int num_reads = 0;
 int num_writes = 0;
 int num_faults = 0;
@@ -185,14 +185,22 @@ int main( int argc, char *argv[] )
 	//Check is nframes>npages
 	if(nframes>npages) nframes = npages;
 
-	//initilaize frame tracker
-	int i = 0;
-	for(i = 0; i < 1024; i++){
-		framemap[i] = -1;
-	}
+	
 	
 	//seedrand
 	srand(time(NULL));
+
+	//malloc arrays
+	framemap = (int *)malloc(sizeof(int)*nframes);
+	lru_counter = (int *)malloc(sizeof(int)*nframes);
+
+	//initilaize frame tracker and lru counter
+	int i = 0;
+	for(i = 0; i < nframes; i++){
+		framemap[i] = -1;
+		lru_counter[i] = 0;
+	}
+
     
     // initialize FIFO counter
     fifo_counter = -1;
@@ -233,6 +241,10 @@ int main( int argc, char *argv[] )
 	disk_close(disk);
 
 	printf("reads: %d\nwrites: %d\nfaults: %d\n", num_reads, num_writes, num_faults);
+
+	//free arrays
+	free(lru_counter);
+	free(framemap);
 
 	return 0;
 }
