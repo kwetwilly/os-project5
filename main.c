@@ -29,6 +29,7 @@ int lru_counter[1024] = {0};
 int num_reads = 0;
 int num_writes = 0;
 int num_faults = 0;
+int reset_counter = 0;
 
 int isFull(){
 	int i = 0;
@@ -67,17 +68,29 @@ int fifo_algo(){
 }
 
 int custom_algo(){
+	//printf("run algo\n");
+	//periodically reste all use counts
+	if(reset_counter == 20){
+		int x = 0;
+		for(x=0; x < nframes; x++ ){
+			lru_counter[x] = 0;
+		}
+		reset_counter = 0;
+	}
 	int lru = lru_counter[0];
 	int frame = 0;
 	int i;
-	for( i = 1; i < nframes; i++){
+	for( i = 0; i < nframes; i++){
+		//printf("frame %d count: %d\n", i, lru_counter[i]);
 		if(lru_counter[i] < lru){
 			lru = lru_counter[i];
 			frame = i;
 		}
 	}
-	lru_counter[frame] = 0;
+
+	lru_counter[frame] = 1;
 	//printf("frame: %d\n", frame);
+	reset_counter++;
 	return frame;
 }
 
