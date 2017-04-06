@@ -49,21 +49,23 @@ int nextOpen(){
 	return -1; //error: should not get here
 }
 
-int random_algo(int page){
+int random_algo(){
 	int newFrame = rand() % nframes;
 	return newFrame;
 }
 
-int custom_algo(int page){
+int custom_algo(){
 	int lru = lru_counter[0];
 	int frame = 0;
 	int i;
-	for( i = 0; i < nframes; i++){
+	for( i = 1; i < nframes; i++){
 		if(lru_counter[i] < lru){
 			lru = lru_counter[i];
 			frame = i;
 		}
 	}
+	lru_counter[frame] = 0;
+	//printf("frame: %d\n", frame);
 	return frame;
 }
 
@@ -81,13 +83,13 @@ void page_fault_handler( struct page_table *pt, int page )
 		if(isFull()){
 			//Decide which frame to put page into
 			if(!strcmp(algorithm,"rand")) {
-				myframe = random_algo(page);
+				myframe = random_algo();
 
 			} else if(!strcmp(algorithm,"fifo")) {
 				myframe = 0; //implement later
 
 			} else if(!strcmp(algorithm,"custom")) {
-				myframe = 0; //implement later
+				myframe = custom_algo();
 
 			} else {
 				printf("unknown algo\n");
@@ -101,6 +103,14 @@ void page_fault_handler( struct page_table *pt, int page )
 			page_table_set_entry( pt, framemap[myframe], 0, 0);		//strip acces from old page
 			num_reads++;
 			num_writes++;
+			if(!strcmp(algorithm,"custom")) {
+				//reset all write permissions
+				int k = 0;
+				for( k = 0; k < nframes; k++){
+					//printf("resetting frame %d\n", k);
+					page_table_set_entry( pt, framemap[k], k, 1);
+				}
+			}
 		}
 		//Else frame is empty
 		else{
@@ -115,6 +125,10 @@ void page_fault_handler( struct page_table *pt, int page )
 	else if(bits == 1){
 		//Add Write permissions
 		page_table_set_entry(pt,page,frame,PROT_READ|PROT_WRITE);
+		if(!strcmp(algorithm,"custom")) {
+			//increment "uses"
+			lru_counter[frame]++;
+		}
 	}
 	
 	//Update which page is in the frame in physical memory
