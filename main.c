@@ -17,20 +17,22 @@ how to use the page table and disk interfaces.
 #include <string.h>
 #include <errno.h>
 #include <time.h>
+#include <ctype.h>
 
 const char *algorithm;
 struct disk *disk;
 char *physmem;
 int nframes;
 int npages;
-int *framemap;
-int fifo_counter;
-int *lru_counter;
+int *framemap; 		//keep track of which page is in which frame
+int fifo_counter; 	//keep track of how long a page has been in memory
+int *lru_counter; 	//keep track of how often each page in memory is accessed
 int num_reads = 0;
 int num_writes = 0;
 int num_faults = 0;
 int reset_counter = 0;
 
+//Check if physical memory is full
 int isFull(){
 	int i = 0;
 	for( i = 0; i < nframes; i++ ){
@@ -41,6 +43,7 @@ int isFull(){
 	return 1;
 }
 
+//Linear search for next open space
 int nextOpen(){
 	int j = 0;
 	for( j = 0; j < nframes; j++){
@@ -51,11 +54,13 @@ int nextOpen(){
 	return -1; //error: should not get here
 }
 
+//Randomly pick frame to evict from
 int random_algo(){
 	int newFrame = rand() % nframes;
 	return newFrame;
 }
 
+//fifo algorithm to remvoe oldest page
 int fifo_algo(){
     if(fifo_counter == nframes-1){
         fifo_counter = 0;
@@ -67,8 +72,8 @@ int fifo_algo(){
     return fifo_counter;
 }
 
+//pseudo LRU to remove least used page
 int custom_algo(){
-	//printf("run algo\n");
 	//periodically reste all use counts
 	if(reset_counter == 20){
 		int x = 0;
@@ -81,7 +86,6 @@ int custom_algo(){
 	int frame = 0;
 	int i;
 	for( i = 0; i < nframes; i++){
-		//printf("frame %d count: %d\n", i, lru_counter[i]);
 		if(lru_counter[i] < lru){
 			lru = lru_counter[i];
 			frame = i;
@@ -89,7 +93,6 @@ int custom_algo(){
 	}
 
 	lru_counter[frame] = 1;
-	//printf("frame: %d\n", frame);
 	reset_counter++;
 	return frame;
 }
@@ -117,8 +120,8 @@ void page_fault_handler( struct page_table *pt, int page )
 				myframe = custom_algo();
 
 			} else {
-				printf("unknown algo\n");
-				myframe = page%nframes; //DEFAULT for now
+				printf("use: virtmem <npages> <nframes> <rand|fifo|custom> <sort|scan|focus>\n");
+				exit(1);
 			}
 			
 			// printf("EVICTED!\n");
@@ -165,15 +168,23 @@ void page_fault_handler( struct page_table *pt, int page )
     if(myframe != -1){
         framemap[myframe] = page;
     }
-    
-	//page_table_get_entry( pt, page, &frame, &bits );
 	// printf("page fault on page #%d\n",page);
+}
+
+int is_int(char num[]){
+	int i;
+	for( i = 0; num[i] != '\0'; i++){
+		if(!isdigit(num[i])){
+			return 0;
+		}
+	}
+	return 1;
 }
 
 int main( int argc, char *argv[] )
 {
 	if(argc!=5) {
-		printf("use: virtmem <npages> <nframes> <rand|fifo|lru|custom> <sort|scan|focus>\n");
+		printf("use: virtmem <npages> <nframes> <rand|fifo|custom> <sort|scan|focus>\n");
 		return 1;
 	}
 
@@ -182,12 +193,28 @@ int main( int argc, char *argv[] )
 	algorithm = argv[3]; //algorithm to use
 	const char *program = argv[4];
 
+	//check nframes and npages both numbers
+	if(!is_int(argv[1]) || !is_int(argv[2])){
+		printf("ERROR: nframes and npages must both be integers\n");
+		return 1;
+	}
+
+	//check nframes and npages both positive
+	if( nframes < 0 || npages < 0){
+		printf("ERROR: npages and nframes must both be positive integers\n");
+		return 1;
+	}
+
 	//Check is nframes>npages
 	if(nframes>npages) nframes = npages;
 
+	//check for valid algorithm
+	if(strcmp(algorithm,"rand") && strcmp(algorithm,"custom") && strcmp(algorithm,"fifo")){
+		printf("ERROR: unknown algorithm\n");
+		return 1;
+	}
 	
-	
-	//seedrand
+	//seed random number
 	srand(time(NULL));
 
 	//malloc arrays
@@ -201,7 +228,6 @@ int main( int argc, char *argv[] )
 		lru_counter[i] = 0;
 	}
 
-    
     // initialize FIFO counter
     fifo_counter = -1;
 	
