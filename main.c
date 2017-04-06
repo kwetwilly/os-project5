@@ -24,6 +24,10 @@ char *physmem;
 int nframes;
 int npages;
 int framemap[1024] = {0};
+int lru_counter[1024] = {0};
+int num_reads = 0;
+int num_writes = 0;
+int num_faults = 0;
 
 int isFull(){
 	int i = 0;
@@ -47,27 +51,34 @@ int nextOpen(){
 
 int random_algo(int page){
 	int newFrame = rand() % nframes;
-    // printf("%d\n", newFrame);
 	return newFrame;
+}
+
+int custom_algo(int page){
+	int lru = lru_counter[0];
+	int frame = 0;
+	int i;
+	for( i = 0; i < nframes; i++){
+		if(lru_counter[i] < lru){
+			lru = lru_counter[i];
+			frame = i;
+		}
+	}
+	return frame;
 }
 
 void page_fault_handler( struct page_table *pt, int page )
 {
-    
-    printf("PAGE FAULT -------------------------\n");
     int frame, bits;
 	int myframe = -1;
 	//Check type of error
 	page_table_get_entry( pt, page, &frame, &bits );
     
-    printf("BITS: %d", bits);
-
 	//No permissions -- not in memory
 	if(bits == 0){
-        printf("Not in PhysMem\n");
+		num_faults++;
 		//If frames all full, kick out a page
 		if(isFull()){
-            printf("PhysMem Full\n");
 			//Decide which frame to put page into
 			if(!strcmp(algorithm,"rand")) {
 				myframe = random_algo(page);
@@ -84,27 +95,24 @@ void page_fault_handler( struct page_table *pt, int page )
 			}
 			
 			// printf("EVICTED!\n");
-            printf("Write %d to disk\n", framemap[myframe]);
 			disk_write( disk, framemap[myframe], &physmem[myframe*PAGE_SIZE]);
-            printf("Read %d from disk\n", page);
 			disk_read( disk, page, &physmem[myframe*PAGE_SIZE]);
-            printf("Resetting Page Table Entry...\n");
 			page_table_set_entry( pt, page, myframe, PROT_READ);	//Give rights to new page
 			page_table_set_entry( pt, framemap[myframe], 0, 0);		//strip acces from old page
+			num_reads++;
+			num_writes++;
 		}
 		//Else frame is empty
 		else{
-            printf("PhysMem Has Space\n");
 			//pick next open frame
 			myframe = nextOpen();
-            printf("Next Open Space: %d\n", myframe);
 			page_table_set_entry(pt,page,myframe,PROT_READ);
 			disk_read( disk, page,&physmem[myframe*PAGE_SIZE]);
+			num_reads++;
 		}
 	}
 	//Read only -- data already in memory
 	else if(bits == 1){
-        printf("Read Only Perm\n");
 		//Add Write permissions
 		page_table_set_entry(pt,page,frame,PROT_READ|PROT_WRITE);
 	}
@@ -113,24 +121,9 @@ void page_fault_handler( struct page_table *pt, int page )
     if(myframe != -1){
         framemap[myframe] = page;
     }
-    
-    printf("Frame Map:\n");
-    
-    int k;
-    for(k = 0; k < nframes; k++){
-        printf("%d: %d\n", k, framemap[k]);
-    }
-    
-    printf("Current Page Table: \n");
-    page_table_print(pt);
 
 	//page_table_get_entry( pt, page, &frame, &bits );
 	printf("page fault on page #%d\n",page);
-    
-    int u;
-    for(u = 0; u < nframes; u++){
-        printf("%d: %d\n", u, physmem[u]);
-    }
 }
 
 int main( int argc, char *argv[] )
@@ -191,6 +184,8 @@ int main( int argc, char *argv[] )
 
 	page_table_delete(pt);
 	disk_close(disk);
+
+	printf("reads: %d\nwrites: %d\nfaults: %d\n", num_reads, num_writes, num_faults);
 
 	return 0;
 }
