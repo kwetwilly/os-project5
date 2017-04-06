@@ -120,7 +120,12 @@ void page_fault_handler( struct page_table *pt, int page )
 				int k = 0;
 				for( k = 0; k < nframes; k++){
 					//printf("resetting frame %d\n", k);
-					page_table_set_entry( pt, framemap[k], k, 1);
+                    if(k == myframe){
+                        page_table_set_entry( pt, framemap[myframe], 0, 0);		//strip acces from old page
+                    }
+                    else{
+                        page_table_set_entry( pt, framemap[k], k, 1);
+                    }
 				}
 			}
 		}
@@ -147,9 +152,9 @@ void page_fault_handler( struct page_table *pt, int page )
     if(myframe != -1){
         framemap[myframe] = page;
     }
-
+    
 	//page_table_get_entry( pt, page, &frame, &bits );
-	printf("page fault on page #%d\n",page);
+	// printf("page fault on page #%d\n",page);
 }
 
 int main( int argc, char *argv[] )
