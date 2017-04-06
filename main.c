@@ -24,6 +24,7 @@ char *physmem;
 int nframes;
 int npages;
 int framemap[1024] = {0};
+int fifo_counter;
 int lru_counter[1024] = {0};
 int num_reads = 0;
 int num_writes = 0;
@@ -52,6 +53,17 @@ int nextOpen(){
 int random_algo(int page){
 	int newFrame = rand() % nframes;
 	return newFrame;
+}
+
+int fifo_algo(){
+    if(fifo_counter == nframes-1){
+        fifo_counter = 0;
+    }
+    else{
+        fifo_counter++;
+    }
+    
+    return fifo_counter;
 }
 
 int custom_algo(int page){
@@ -84,7 +96,7 @@ void page_fault_handler( struct page_table *pt, int page )
 				myframe = random_algo(page);
 
 			} else if(!strcmp(algorithm,"fifo")) {
-				myframe = 0; //implement later
+				myframe = fifo_algo(); //implement later
 
 			} else if(!strcmp(algorithm,"custom")) {
 				myframe = 0; //implement later
@@ -149,6 +161,9 @@ int main( int argc, char *argv[] )
 	
 	//seedrand
 	srand(time(NULL));
+    
+    // initialize FIFO counter
+    fifo_counter = -1;
 	
 
 	disk = disk_open("myvirtualdisk",npages);
